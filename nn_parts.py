@@ -1,19 +1,4 @@
 import tensorflow as tf
-import math
-
-initial_a_parameter = 0.01
-
-
-def _fully_connected(X, size):
-    input_dim = X.shape.as_list()[1]
-    maxval = math.sqrt(2.0/(input_dim*(1.0 + initial_a_parameter**2)))
-
-    W = tf.get_variable(
-        'W', [input_dim, size], tf.float32,
-        tf.random_uniform_initializer(-maxval, maxval)
-    )
-
-    return tf.matmul(X, W)
 
 
 def _dropout(X, rate, is_training):
@@ -31,11 +16,7 @@ def _dropout(X, rate, is_training):
 
 
 def _nonlinearity(X):
-    a = tf.get_variable(
-        'a', [], tf.float32,
-        tf.constant_initializer(initial_a_parameter)
-    )
-    return tf.where(tf.greater_equal(X, 0.0), X, tf.scalar_mul(a, X), name='PReLU')
+    return tf.nn.relu6(X, name='ReLU6')
 
 
 def _batch_norm(X, is_training):
@@ -43,23 +24,6 @@ def _batch_norm(X, is_training):
         X, is_training=is_training, scale=True,
         fused=True, scope='BatchNorm'
     )
-
-
-def _affine(X, size):
-    input_dim = X.shape.as_list()[1]
-    maxval = math.sqrt(2.0/(input_dim*(1.0 + initial_a_parameter**2)))
-
-    W = tf.get_variable(
-        'W', [input_dim, size], tf.float32,
-        tf.random_uniform_initializer(-maxval, maxval)
-    )
-
-    b = tf.get_variable(
-        'b', [size], tf.float32,
-        tf.zeros_initializer()
-    )
-
-    return tf.nn.bias_add(tf.matmul(X, W), b)
 
 
 def _conv(X, filters, kernel=1, strides=1, padding='SAME', use_bias=False, trainable=True):
@@ -86,8 +50,6 @@ def _conv(X, filters, kernel=1, strides=1, padding='SAME', use_bias=False, train
     return tf.nn.conv2d(X, W, [1, strides, strides, 1], padding)
 
 
-
-
 def _depthwise_conv2d(X, kernel=3, strides=1, padding='SAME', trainable=True):
 
     in_channels = X.shape.as_list()[-1]
@@ -111,7 +73,7 @@ def _mapping(X, num_classes, is_training):
     with tf.variable_scope('Conv2d_0'):
         result = _conv(X, 32, kernel=3, strides=2)
         result = _batch_norm(result, is_training)
-        result = tf.nn.relu6(result, name='ReLU')
+        result = _nonlinearity(result)
 
     filters = [
         64, 128, 128, 256, 256, 512,
@@ -129,12 +91,12 @@ def _mapping(X, num_classes, is_training):
         with tf.variable_scope('Conv2d_' + str(i + 1) + '_depthwise'):
             result = _depthwise_conv2d(result, strides=strides[i])
             result = _batch_norm(result, is_training)
-            result = tf.nn.relu6(result, name='ReLU')
+            result = _nonlinearity(result)
 
         with tf.variable_scope('Conv2d_' + str(i + 1) + '_pointwise'):
             result = _conv(result, filters[i])
             result = _batch_norm(result, is_training)
-            result = tf.nn.relu6(result, name='ReLU')
+            result = _nonlinearity(result)
 
     result = _global_average_pooling(result)
     result = _dropout(result, 1e-3, is_training)

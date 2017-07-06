@@ -52,12 +52,8 @@ class MobileNet:
                 self.init = tf.global_variables_initializer()
                 self.saver = tf.train.Saver()
                 self.assign_weights = _assign_weights()
-                self.accuracy = tf.reduce_mean(
-                    tf.cast(
-                        tf.equal(tf.argmax(self.predictions, 1), tf.argmax(Y, 1)),
-                        tf.float32
-                    )
-                )
+                is_equal = tf.equal(tf.argmax(self.predictions, 1), tf.argmax(Y, 1))
+                self.accuracy = tf.reduce_mean(tf.cast(is_equal, tf.float32))
 
             self.merged = _add_summaries()
 
@@ -87,8 +83,8 @@ class MobileNet:
         sess.run(self.init_data, feed_dict_train)
 
         if not warm:
-            sess.run(self.init, initial_weights)
-            for w in self.assign_weights:
+            sess.run(self.init)
+            for w in initial_weights:
                 op = self.assign_weights[w]
                 sess.run(op, {'utilities/' + w: initial_weights[w]})
         else:
@@ -131,7 +127,7 @@ class MobileNet:
 
     def predict_proba(self, X):
         sess = tf.Session(graph=self.graph)
-        self.saver.restore(sess, 'saved_model/mobilenet_v1_1.0_224.ckpt')
+        self.saver.restore(sess, 'saved/run' + str(self.run) + '/model')
         feed_dict = {'inputs/X:0': X, 'control/is_training:0': False}
         predictions = sess.run(self.predictions, feed_dict)
         sess.close()
@@ -155,7 +151,7 @@ class MobileNet:
 
             choice = np.random.choice(
                 np.arange(0, len(X_train)),
-                size=4*batch_size, replace=False
+                size=8*batch_size, replace=False
             )
 
             feed_dict_train = {
@@ -168,8 +164,9 @@ class MobileNet:
                 'inputs/Y:0': Y_test,
                 'control/is_training:0': False
             }
-            train_loss, train_accuracy = sess.run([self.log_loss, self.accuracy], feed_dict_train)
-            test_loss, test_accuracy = sess.run([self.log_loss, self.accuracy], feed_dict_test)
+            score_ops = [self.log_loss, self.accuracy]
+            train_loss, train_accuracy = sess.run(score_ops, feed_dict_train)
+            test_loss, test_accuracy = sess.run(score_ops, feed_dict_test)
             end = time.time()
 
             if verbose:

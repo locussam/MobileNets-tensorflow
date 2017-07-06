@@ -35,12 +35,9 @@ def _get_data(num_classes):
 def _add_summaries():
     summaries = []
     trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    activations = tf.get_collection(tf.GraphKeys.ACTIVATIONS)
 
     for v in trainable_vars:
         summaries += [tf.summary.histogram(v.name[:-2] + '_hist', v)]
-    for a in activations:
-        summaries += [tf.summary.histogram(a.name[:-2] + '_activ_hist', a)]
 
     return tf.summary.merge(summaries)
 
