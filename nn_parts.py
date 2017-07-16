@@ -22,7 +22,9 @@ def _nonlinearity(X):
 def _batch_norm(X, is_training):
     return tf.contrib.layers.batch_norm(
         X, is_training=is_training, scale=True,
-        fused=True, scope='BatchNorm'
+        fused=True, scope='BatchNorm',
+        variables_collections=tf.GraphKeys.MODEL_VARIABLES,
+        trainable=True
     )
 
 
@@ -42,7 +44,9 @@ def _conv(X, filters, kernel=1, strides=1, padding='SAME', use_bias=False, train
             'biases', [filters], tf.float32,
             tf.zeros_initializer(), trainable=trainable
         )
+
         tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, b)
+
         return tf.nn.bias_add(
             tf.nn.conv2d(X, W, [1, strides, strides, 1], padding), b
         )
@@ -116,9 +120,9 @@ def _add_weight_decay(weight_decay):
     )
 
     trainable = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    kernels = [v for v in trainable if 'kernel' in v.name]
+    weights = [v for v in trainable if 'weights' in v.name]
 
-    for K in kernels:
+    for K in weights:
         l2_loss = tf.multiply(
             weight_decay, tf.nn.l2_loss(K), name='l2_loss'
         )
