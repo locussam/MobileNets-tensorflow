@@ -1,6 +1,10 @@
 import tensorflow as tf
 
 
+def _nonlinearity(X):
+    return tf.nn.relu6(X, name='ReLU6')
+
+
 def _dropout(X, rate, is_training):
     keep_prob = tf.constant(
         1.0 - rate, tf.float32,
@@ -15,16 +19,19 @@ def _dropout(X, rate, is_training):
     return result
 
 
-def _nonlinearity(X):
-    return tf.nn.relu6(X, name='ReLU6')
-
-
 def _batch_norm(X, is_training):
     return tf.contrib.layers.batch_norm(
         X, is_training=is_training, scale=True,
         fused=True, scope='BatchNorm',
         variables_collections=tf.GraphKeys.MODEL_VARIABLES,
         trainable=True
+    )
+
+
+def _global_average_pooling(X):
+    return tf.reduce_mean(
+        X, axis=[1, 2], keep_dims=True,
+        name='global_average_pooling'
     )
 
 
@@ -54,7 +61,7 @@ def _conv(X, filters, kernel=1, strides=1, padding='SAME', use_bias=False, train
     return tf.nn.conv2d(X, W, [1, strides, strides, 1], padding)
 
 
-def _depthwise_conv2d(X, kernel=3, strides=1, padding='SAME', trainable=True):
+def _depthwise_conv(X, kernel=3, strides=1, padding='SAME', trainable=True):
 
     in_channels = X.shape.as_list()[-1]
 
@@ -66,10 +73,6 @@ def _depthwise_conv2d(X, kernel=3, strides=1, padding='SAME', trainable=True):
     tf.add_to_collection(tf.GraphKeys.MODEL_VARIABLES, W)
 
     return tf.nn.depthwise_conv2d(X, W, [1, strides, strides, 1], padding)
-
-
-def _global_average_pooling(X):
-    return tf.reduce_mean(X, axis=[1, 2], keep_dims=True)
 
 
 def _mapping(X, num_classes, is_training):
@@ -93,7 +96,7 @@ def _mapping(X, num_classes, is_training):
 
     for i in range(0, 13):
         with tf.variable_scope('Conv2d_' + str(i + 1) + '_depthwise'):
-            result = _depthwise_conv2d(result, strides=strides[i])
+            result = _depthwise_conv(result, strides=strides[i])
             result = _batch_norm(result, is_training)
             result = _nonlinearity(result)
 
@@ -120,9 +123,9 @@ def _add_weight_decay(weight_decay):
     )
 
     trainable = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    weights = [v for v in trainable if 'weights' in v.name]
+    kernels = [v for v in trainable if 'weights' in v.name]
 
-    for K in weights:
+    for K in kernels:
         l2_loss = tf.multiply(
             weight_decay, tf.nn.l2_loss(K), name='l2_loss'
         )
